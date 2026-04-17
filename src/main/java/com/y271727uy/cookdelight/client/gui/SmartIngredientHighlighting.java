@@ -1,185 +1,34 @@
 package com.y271727uy.cookdelight.client.gui;
 
-import com.y271727uy.cookdelight.TweaksDelight;
-import com.y271727uy.cookdelight.config.TweaksDelightConfig;
+import com.y271727uy.cookdelight.client.logic.IngredientHighlightHandler;
+import com.y271727uy.cookdelight.client.recipe.RecipeLookupService;
+import com.y271727uy.cookdelight.client.render.IngredientHighlightRenderer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeManager;
-import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.ScreenEvent;
 
-import java.util.ArrayList;
-import java.util.List;
-
-@Mod.EventBusSubscriber(modid = TweaksDelight.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class SmartIngredientHighlighting {
+    private final IngredientHighlightHandler handler;
+    private final IngredientHighlightRenderer renderer;
 
-    private static Slot lastHoveredSlot = null;
-    private static long hoverStartTime = 0;
-    private static final List<ItemStack> requiredIngredients = new ArrayList<>();
-    private static boolean highlightActive = false;
-    private static ItemStack trackingItem = ItemStack.EMPTY;
+    public SmartIngredientHighlighting() {
+        this(RecipeLookupService.getInstance());
+    }
+
+    public SmartIngredientHighlighting(RecipeLookupService recipeLookupService) {
+        this.handler = new IngredientHighlightHandler(recipeLookupService);
+        this.renderer = new IngredientHighlightRenderer();
+    }
 
     @SubscribeEvent
-    public static void onScreenRender(ScreenEvent.Render.Post event) {
-        if (!TweaksDelightConfig.CLIENT.enableSmartIngredientHighlighting.get()) return;
-
+    public void onScreenRender(ScreenEvent.Render.Post event) {
         if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen)) {
-            resetState();
+            handler.reset();
             return;
         }
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) return;
-
-        int guiLeft = screen.getGuiLeft();
-        int guiTop = screen.getGuiTop();
-        double mouseX = event.getMouseX();
-        double mouseY = event.getMouseY();
-
-        Slot currentlyHovered = null;
-        for (Slot slot : screen.getMenu().slots) {
-            if (mouseX >= guiLeft + slot.x && mouseX < guiLeft + slot.x + 16 &&
-                mouseY >= guiTop + slot.y && mouseY < guiTop + slot.y + 16) {
-                currentlyHovered = slot;
-                break;
-            }
-        }
-
-        if (currentlyHovered != null && currentlyHovered.hasItem() && Screen.hasShiftDown()) {
-            ItemStack stack = currentlyHovered.getItem();
-            if (isFoodItem(stack)) {
-                if (lastHoveredSlot != currentlyHovered || !ItemStack.isSameItemSameTags(stack, trackingItem)) {
-                    lastHoveredSlot = currentlyHovered;
-                    trackingItem = stack.copy();
-                    hoverStartTime = System.currentTimeMillis();
-                    highlightActive = false;
-                } else if (!highlightActive && System.currentTimeMillis() - hoverStartTime > TweaksDelightConfig.CLIENT.smartIngredientHighlightingDelay.get()) {
-                    highlightActive = true;
-                    loadIngredients(mc, trackingItem);
-                }
-            } else {
-                resetState();
-            }
-        } else {
-            resetState();
-        }
-
-        if (highlightActive && !requiredIngredients.isEmpty()) {
-            GuiGraphics graphics = event.getGuiGraphics();
-            graphics.pose().pushPose();
-            graphics.pose().translate(0, 0, 300);
-
-            for (Slot slot : screen.getMenu().slots) {
-                if (slot == currentlyHovered) continue;
-
-                int x = guiLeft + slot.x;
-                int y = guiTop + slot.y;
-
-                if (!slot.hasItem()) {
-                    graphics.fill(x, y, x + 16, y + 16, 0x88C6C6C6);
-                    continue;
-                }
-
-                ItemStack slotItem = slot.getItem();
-                boolean isIngredient = false;
-                for (ItemStack req : requiredIngredients) {
-                    if (ItemStack.isSameItem(slotItem, req)) {
-                        isIngredient = true;
-                        break;
-                    }
-                }
-
-                if (!isIngredient) {
-                    graphics.fill(x, y, x + 16, y + 16, 0xAA8B8B8B);
-                }
-            }
-
-            graphics.pose().popPose();
-        }
+        handler.update(Minecraft.getInstance(), screen, event.getMouseX(), event.getMouseY());
+        renderer.render(event.getGuiGraphics(), screen, handler.getState());
     }
-
-    private static void resetState() {
-        lastHoveredSlot = null;
-        highlightActive = false;
-        trackingItem = ItemStack.EMPTY;
-        requiredIngredients.clear();
-    }
-
-    private static void loadIngredients(Minecraft mc, ItemStack target) {
-        requiredIngredients.clear();
-        if (mc.level == null) return;
-
-        RecipeManager rm = mc.level.getRecipeManager();
-        List<Recipe<?>> matchingRecipes = new ArrayList<>();
-
-        for (Recipe<?> recipe : rm.getRecipes()) {
-            ItemStack result = recipe.getResultItem(mc.level.registryAccess());
-            if (!result.isEmpty() && ItemStack.isSameItem(result, target)) {
-                matchingRecipes.add(recipe);
-            }
-        }
-
-        if (matchingRecipes.isEmpty()) return;
-
-        RegistryAccess registryAccess = mc.level.registryAccess();
-
-        Recipe<?> selected = null;
-        for (Recipe<?> recipe : matchingRecipes) {
-            if (RecipeTypeCompat.matchesExactThenKeywords(registryAccess, recipe, "farmersdelight:cooking", "cooking", "brew", "ferment")) {
-                selected = recipe;
-                break;
-            }
-        }
-
-        if (selected == null) {
-            for (Recipe<?> recipe : matchingRecipes) {
-                if (RecipeTypeCompat.matchesExactThenKeywords(registryAccess, recipe, "farmersdelight:cutting", "cutting", "slice", "slicing")) {
-                    selected = recipe;
-                    break;
-                }
-            }
-        }
-
-        if (selected == null) {
-            for (Recipe<?> recipe : matchingRecipes) {
-                if (RecipeTypeCompat.matchesNamespaceAndKeywords(registryAccess, recipe, "kaleidoscope_cookery", "pot", "cooking", "recipe")) {
-                    selected = recipe;
-                    break;
-                }
-            }
-        }
-
-        if (selected == null) {
-            selected = matchingRecipes.get(0);
-        }
-
-        for (Ingredient ing : selected.getIngredients()) {
-            if (ing.isEmpty()) continue;
-            for (ItemStack option : ing.getItems()) {
-                if (!option.isEmpty()) {
-                    requiredIngredients.add(option.copy());
-                }
-            }
-        }
-    }
-
-    private static boolean isFoodItem(ItemStack stack) {
-        if (stack.getItem().isEdible()) return true;
-
-        String id = stack.getItem().toString().toLowerCase();
-        return id.contains("pie") || id.contains("stew") || id.contains("soup") ||
-               id.contains("feast") || id.contains("cake") || id.contains("meal") ||
-               id.contains("salad") || id.contains("potage") || id.contains("roast");
-    }
-
 }
