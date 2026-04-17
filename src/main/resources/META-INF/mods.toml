@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="ARR"
+
+[[mods]]
+modId="cookdelight"
+version="1.0.0"
+displayName="Cook Delight"
+authors="y271727uy"
+description='''An addon mod for Farmer's Delight that adds extra quality of life features.'''
+
+[[dependencies.cookdelight]]
+modId="minecraft"
+mandatory=true
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.cookdelight]]
+modId="farmersdelight"
+mandatory=true
+versionRange="[0,)"
+ordering="NONE"
+side="BOTH"
+
+
