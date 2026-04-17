@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -56,7 +57,7 @@ public class SmartIngredientHighlighting {
 
         if (currentlyHovered != null && currentlyHovered.hasItem() && Screen.hasShiftDown()) {
             ItemStack stack = currentlyHovered.getItem();
-            if (stack.getItem().isEdible()) {
+            if (isFoodItem(stack)) {
                 if (lastHoveredSlot != currentlyHovered || !ItemStack.isSameItemSameTags(stack, trackingItem)) {
                     lastHoveredSlot = currentlyHovered;
                     trackingItem = stack.copy();
@@ -99,7 +100,7 @@ public class SmartIngredientHighlighting {
                 }
 
                 if (!isIngredient) {
-                    graphics.fill(x, y, x + 16, y + 16, 0xAA8B8B8B); 
+                    graphics.fill(x, y, x + 16, y + 16, 0xAA8B8B8B);
                 }
             }
 
@@ -116,34 +117,43 @@ public class SmartIngredientHighlighting {
 
     private static void loadIngredients(Minecraft mc, ItemStack target) {
         requiredIngredients.clear();
-        RecipeManager rm = mc.level.getRecipeManager();
-        if (rm == null) return;
+        if (mc.level == null) return;
 
+        RecipeManager rm = mc.level.getRecipeManager();
         List<Recipe<?>> matchingRecipes = new ArrayList<>();
-        
+
         for (Recipe<?> recipe : rm.getRecipes()) {
             ItemStack result = recipe.getResultItem(mc.level.registryAccess());
-            if (result != null && !result.isEmpty() && ItemStack.isSameItem(result, target)) {
+            if (!result.isEmpty() && ItemStack.isSameItem(result, target)) {
                 matchingRecipes.add(recipe);
             }
         }
 
         if (matchingRecipes.isEmpty()) return;
 
+        RegistryAccess registryAccess = mc.level.registryAccess();
+
         Recipe<?> selected = null;
-        for (Recipe<?> h : matchingRecipes) {
-            String typeStr = h.getType().toString();
-            if (typeStr.contains("cooking") || typeStr.contains("farmersdelight:cooking")) {
-                selected = h;
+        for (Recipe<?> recipe : matchingRecipes) {
+            if (RecipeTypeCompat.matchesExactThenKeywords(registryAccess, recipe, "farmersdelight:cooking", "cooking", "brew", "ferment")) {
+                selected = recipe;
                 break;
             }
         }
-        
+
         if (selected == null) {
-            for (Recipe<?> h : matchingRecipes) {
-                String typeStr = h.getType().toString();
-                if (typeStr.contains("cutting") || typeStr.contains("farmersdelight:cutting")) {
-                    selected = h;
+            for (Recipe<?> recipe : matchingRecipes) {
+                if (RecipeTypeCompat.matchesExactThenKeywords(registryAccess, recipe, "farmersdelight:cutting", "cutting", "slice", "slicing")) {
+                    selected = recipe;
+                    break;
+                }
+            }
+        }
+
+        if (selected == null) {
+            for (Recipe<?> recipe : matchingRecipes) {
+                if (RecipeTypeCompat.matchesNamespaceAndKeywords(registryAccess, recipe, "kaleidoscope_cookery", "pot", "cooking", "recipe")) {
+                    selected = recipe;
                     break;
                 }
             }
@@ -162,4 +172,14 @@ public class SmartIngredientHighlighting {
             }
         }
     }
+
+    private static boolean isFoodItem(ItemStack stack) {
+        if (stack.getItem().isEdible()) return true;
+
+        String id = stack.getItem().toString().toLowerCase();
+        return id.contains("pie") || id.contains("stew") || id.contains("soup") ||
+               id.contains("feast") || id.contains("cake") || id.contains("meal") ||
+               id.contains("salad") || id.contains("potage") || id.contains("roast");
+    }
+
 }

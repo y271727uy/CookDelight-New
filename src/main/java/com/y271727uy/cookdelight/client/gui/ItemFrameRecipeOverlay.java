@@ -98,14 +98,16 @@ public class ItemFrameRecipeOverlay {
 
     private static void updateCachedRecipe(Minecraft mc, ItemStack target) {
         cachedIngredients.clear();
-        RecipeManager rm = mc.level.getRecipeManager();
-        if (rm == null) return;
+        if (mc.level == null) return;
+
+        var level = mc.level;
+        RecipeManager rm = level.getRecipeManager();
 
         List<Recipe<?>> matchingRecipes = new ArrayList<>();
         
         for (Recipe<?> recipe : rm.getRecipes()) {
             ItemStack result = recipe.getResultItem(mc.level.registryAccess());
-            if (result != null && !result.isEmpty() && ItemStack.isSameItem(result, target)) {
+            if (!result.isEmpty() && ItemStack.isSameItem(result, target)) {
                 matchingRecipes.add(recipe);
             }
         }
@@ -114,8 +116,7 @@ public class ItemFrameRecipeOverlay {
 
         Recipe<?> selected = null;
         for (Recipe<?> h : matchingRecipes) {
-            String typeStr = h.getType().toString();
-            if (typeStr.contains("cooking") || typeStr.contains("farmersdelight:cooking")) {
+            if (RecipeTypeCompat.matchesExactThenKeywords(mc.level.registryAccess(), h, "farmersdelight:cooking", "cooking", "brew", "ferment")) {
                 selected = h;
                 break;
             }
@@ -123,8 +124,16 @@ public class ItemFrameRecipeOverlay {
         
         if (selected == null) {
             for (Recipe<?> h : matchingRecipes) {
-                String typeStr = h.getType().toString();
-                if (typeStr.contains("cutting") || typeStr.contains("farmersdelight:cutting")) {
+                if (RecipeTypeCompat.matchesExactThenKeywords(mc.level.registryAccess(), h, "farmersdelight:cutting", "cutting", "slice", "slicing")) {
+                    selected = h;
+                    break;
+                }
+            }
+        }
+
+        if (selected == null) {
+            for (Recipe<?> h : matchingRecipes) {
+                if (RecipeTypeCompat.matchesTypeKeywords(mc.level.registryAccess(), h, "pot")) {
                     selected = h;
                     break;
                 }
@@ -146,6 +155,9 @@ public class ItemFrameRecipeOverlay {
         if (!TweaksDelightConfig.CLIENT.enableItemFrameRecipeOverlay.get()) return;
 
         Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        var level = mc.level;
+
         float partialTicks = event.getPartialTick();
         
         float lerpedFade = Mth.lerp(partialTicks, prevFadeProgress, fadeProgress);
@@ -193,7 +205,7 @@ public class ItemFrameRecipeOverlay {
         for (int i = 0; i < cachedIngredients.size(); i++) {
             ItemStack[] stacks = cachedIngredients.get(i).getItems();
             if (stacks.length > 0) {
-                int index = (int) ((mc.level.getGameTime() / 20) % stacks.length);
+                int index = (int) ((level.getGameTime() / 20) % stacks.length);
                 int col = i % itemsPerRow;
                 int row = i / itemsPerRow;
                 graphics.renderItem(stacks[index], gridStartX + col * 18, gridStartY + row * 18);
@@ -215,11 +227,11 @@ public class ItemFrameRecipeOverlay {
     private static boolean isFoodItem(ItemStack stack) {
         if (stack.getItem().isEdible()) return true;
 
-        // Custom check for placeable food blocks (like pies, feasts, stews) 
+        // Custom check for placeable food blocks (like pies, feasts, stews)
         // that frequently don't have the FOOD component attached directly to the item.
         String id = stack.getItem().toString().toLowerCase();
-        return id.contains("pie") || id.contains("stew") || id.contains("soup") || 
-               id.contains("feast") || id.contains("cake") || id.contains("meal") || 
+        return id.contains("pie") || id.contains("stew") || id.contains("soup") ||
+               id.contains("feast") || id.contains("cake") || id.contains("meal") ||
                id.contains("salad") || id.contains("potage") || id.contains("roast");
     }
 }

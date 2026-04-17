@@ -7,10 +7,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -57,14 +60,16 @@ public class KitchenUtilsOverlay {
             BlockEntity be = mc.level.getBlockEntity(pos);
 
             if (be != null) {
-                String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(be.getType()).toString();
+                RegistryAccess registryAccess = mc.level.registryAccess();
+                ResourceLocation idLocation = registryAccess.registryOrThrow(Registries.BLOCK_ENTITY_TYPE).getKey(be.getType());
+                String id = idLocation == null ? "" : idLocation.toString();
                 if (id.equals("farmersdelight:cooking_pot") && TweaksDelightConfig.CLIENT.enableCookingPotOverlay.get() ||
                     id.equals("farmersdelight:skillet") && TweaksDelightConfig.CLIENT.enableSkilletOverlay.get()) {
                     lookingAtPot = true;
                     isSkillet = id.equals("farmersdelight:skillet");
                     if (targetBlockPos == null || !targetBlockPos.equals(pos) || mc.level.getGameTime() % 5 == 0) {
                         targetBlockPos = pos;
-                        updatePotContents(mc, pos, be);
+                        updatePotContents(mc, be);
                     }
                 }
             }
@@ -90,8 +95,9 @@ public class KitchenUtilsOverlay {
         }
     }
 
-    private static void updatePotContents(Minecraft mc, BlockPos pos, BlockEntity be) {
+    private static void updatePotContents(Minecraft mc, BlockEntity be) {
         potIngredients.clear();
+        if (mc.level == null) return;
         
         if (be instanceof Container container) {
             int limit = Math.min(6, container.getContainerSize());
@@ -155,15 +161,16 @@ public class KitchenUtilsOverlay {
             predictedOutput = ItemStack.EMPTY;
             return;
         }
-        RecipeManager rm = mc.level.getRecipeManager();
-        if (rm == null) return;
+        var level = mc.level;
+        if (level == null) return;
+
+        RecipeManager rm = level.getRecipeManager();
 
         for (Recipe<?> recipe : rm.getRecipes()) {
-            String typeStr = recipe.getType().toString();
             if (isSkillet) {
-                if (!typeStr.contains("campfire_cooking")) continue;
+                if (!RecipeTypeCompat.matchesExactThenKeywords(mc.level.registryAccess(), recipe, "farmersdelight:campfire_cooking", "campfire_cooking", "campfire", "cook")) continue;
             } else {
-                if (!typeStr.contains("farmersdelight:cooking")) continue;
+                if (!RecipeTypeCompat.matchesExactThenKeywords(mc.level.registryAccess(), recipe, "farmersdelight:cooking", "cooking", "brew", "ferment")) continue;
             }
 
             boolean matches = true;
