@@ -9,8 +9,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.phys.BlockHitResult;
 
 import java.util.List;
 import java.util.Optional;
@@ -86,18 +84,6 @@ public class ItemFrameOverlayHandler {
             }
         }
 
-        if (minecraft.hitResult instanceof BlockHitResult blockHitResult) {
-            BlockEntity blockEntity = minecraft.level.getBlockEntity(blockHitResult.getBlockPos());
-            if (blockEntity != null && blockEntity.getClass().getName().contains("fastitemframes")) {
-                try {
-                    Object result = blockEntity.getClass().getMethod("getItem").invoke(blockEntity);
-                    if (result instanceof ItemStack stack && !stack.isEmpty()) {
-                        return Optional.of(new FrameTarget(blockHitResult.getBlockPos(), stack.copy()));
-                    }
-                } catch (ReflectiveOperationException ignored) {
-                }
-            }
-        }
 
         return Optional.empty();
     }

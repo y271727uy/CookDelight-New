@@ -21,9 +21,13 @@ public class CookDelightConfig {
         public final ForgeConfigSpec.IntValue smartIngredientHighlightingDelay;
         public final ForgeConfigSpec.BooleanValue enableCookingPotOverlay;
         public final ForgeConfigSpec.BooleanValue enableSkilletOverlay;
+        public final ForgeConfigSpec.BooleanValue enableKaleidoscopeOverlay;
+        public final ForgeConfigSpec.BooleanValue enableKegOverlay;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> preferredOutputRecipeTypes;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> cookingPotRecipeTypes;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> skilletRecipeTypes;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> kaleidoscopeRecipeTypes;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> kegRecipeTypes;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> foodKeywordHints;
 
         public Client(ForgeConfigSpec.Builder builder) {
@@ -48,6 +52,14 @@ public class CookDelightConfig {
             enableSkilletOverlay = builder
                     .comment("Enable the quick HUD when looking at a Skillet")
                     .define("enableSkilletOverlay", true);
+
+            enableKaleidoscopeOverlay = builder
+                    .comment("Enable the quick HUD when looking at Kaleidoscope Cookery blocks")
+                    .define("enableKaleidoscopeOverlay", true);
+
+            enableKegOverlay = builder
+                    .comment("Enable the quick HUD when looking at a Brewin' and Chewin' Keg")
+                    .define("enableKegOverlay", true);
 
             preferredOutputRecipeTypes = builder
                     .comment("Recipe type priority used when resolving an item into its preferred ingredient list")
@@ -76,6 +88,21 @@ public class CookDelightConfig {
                             "campfire_cooking",
                             "smoking",
                             "skillet"
+                    ), value -> value instanceof String string && !string.trim().isEmpty());
+
+            kaleidoscopeRecipeTypes = builder
+                    .comment("Recipe type fragments checked when predicting the output of Kaleidoscope Cookery blocks")
+                    .defineList("kaleidoscopeRecipeTypes", List.of(
+                            "kaleidoscope_cookery:pot",
+                            "kaleidoscope_cookery:stockpot",
+                            "kaleidoscope_cookery:shawarma_spit"
+                    ), value -> value instanceof String string && !string.trim().isEmpty());
+
+            kegRecipeTypes = builder
+                    .comment("Recipe type fragments checked when predicting the output of a Brewin' and Chewin' Keg")
+                    .defineList("kegRecipeTypes", List.of(
+                            "brewinandchewin:keg",
+                            "keg"
                     ), value -> value instanceof String string && !string.trim().isEmpty());
 
             foodKeywordHints = builder

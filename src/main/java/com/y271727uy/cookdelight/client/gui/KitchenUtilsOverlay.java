@@ -13,7 +13,7 @@ public class KitchenUtilsOverlay {
     private final KitchenOverlayRenderer renderer;
 
     public KitchenUtilsOverlay() {
-        this(RecipeLookupService.getInstance());
+        this(new RecipeLookupService());
     }
 
     public KitchenUtilsOverlay(RecipeLookupService recipeLookupService) {

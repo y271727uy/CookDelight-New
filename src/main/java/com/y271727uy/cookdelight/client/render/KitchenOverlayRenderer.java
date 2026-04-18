@@ -4,7 +4,6 @@ import com.y271727uy.cookdelight.client.state.KitchenOverlayState;
 import com.y271727uy.cookdelight.registry.ItemRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
@@ -29,10 +28,7 @@ public class KitchenOverlayRenderer {
         int y = minecraft.getWindow().getGuiScaledHeight() / 2 + 15;
 
         BoxRenderer.BoxRenderContext box = boxRenderer.begin(graphics, x, y, boxWidth, boxHeight, fade, 200);
-        Component header = state.skillet()
-                ? Component.translatable("gui.cookdelight.skillet")
-                : Component.translatable("gui.cookdelight.cooking_pot");
-        graphics.drawString(minecraft.font, header, box.x() + 4, box.y() + 4, box.textColor(), false);
+        graphics.drawString(minecraft.font, state.title(), box.x() + 4, box.y() + 4, box.textColor(), false);
 
         int currentX = box.x() + 4;
         int itemY = box.y() + 17;

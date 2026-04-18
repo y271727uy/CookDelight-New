@@ -13,7 +13,7 @@ public class SmartIngredientHighlighting {
     private final IngredientHighlightRenderer renderer;
 
     public SmartIngredientHighlighting() {
-        this(RecipeLookupService.getInstance());
+        this(new RecipeLookupService());
     }
 
     public SmartIngredientHighlighting(RecipeLookupService recipeLookupService) {

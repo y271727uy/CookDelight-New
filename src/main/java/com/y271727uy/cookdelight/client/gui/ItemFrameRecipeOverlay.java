@@ -13,7 +13,7 @@ public class ItemFrameRecipeOverlay {
     private final ItemFrameOverlayRenderer renderer;
 
     public ItemFrameRecipeOverlay() {
-        this(RecipeLookupService.getInstance());
+        this(new RecipeLookupService());
     }
 
     public ItemFrameRecipeOverlay(RecipeLookupService recipeLookupService) {

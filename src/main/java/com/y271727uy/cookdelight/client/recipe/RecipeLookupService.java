@@ -1,7 +1,7 @@
 package com.y271727uy.cookdelight.client.recipe;
 
 import com.y271727uy.cookdelight.config.CookDelightConfig;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -18,17 +18,11 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class RecipeLookupService {
-    private static final RecipeLookupService INSTANCE = new RecipeLookupService();
-
     private final Map<String, Optional<ResolvedRecipe>> outputCache = new HashMap<>();
     private final Map<String, Optional<ResolvedRecipe>> ingredientCache = new HashMap<>();
     private RecipeManager cachedRecipeManager;
 
-    private RecipeLookupService() {
-    }
-
-    public static RecipeLookupService getInstance() {
-        return INSTANCE;
+    public RecipeLookupService() {
     }
 
     public Optional<ResolvedRecipe> findPreferredRecipeByOutput(Level level, ItemStack output) {
@@ -83,7 +77,7 @@ public final class RecipeLookupService {
         List<Recipe<?>> matches = new ArrayList<>();
         for (Recipe<?> recipe : level.getRecipeManager().getRecipes()) {
             ItemStack result = recipe.getResultItem(level.registryAccess());
-            if (!result.isEmpty() && ItemStack.isSameItem(result, output)) {
+            if (!result.isEmpty() && ItemStack.isSameItemSameTags(result, output)) {
                 matches.add(recipe);
             }
         }
@@ -93,15 +87,15 @@ public final class RecipeLookupService {
         }
 
         List<String> priorities = normalizedPatterns(LookupProfile.OUTPUT_PREFERENCE);
-        matches.sort(Comparator.comparingInt(recipe -> priorityOf(recipe, priorities)));
+        matches.sort(Comparator.comparingInt(recipe -> priorityOf(level, recipe, priorities)));
         return Optional.of(toResolvedRecipe(level, matches.get(0)));
     }
 
     private Optional<ResolvedRecipe> resolvePredictedRecipe(Level level, List<ItemStack> inputs, LookupProfile profile) {
         List<String> patterns = normalizedPatterns(profile);
         List<Recipe<?>> candidates = level.getRecipeManager().getRecipes().stream()
-                .filter(recipe -> patterns.isEmpty() || matchesConfiguredType(recipe, patterns))
-                .sorted(Comparator.comparingInt(recipe -> priorityOf(recipe, patterns)))
+                .filter(recipe -> patterns.isEmpty() || matchesConfiguredType(level, recipe, patterns))
+                .sorted(Comparator.comparingInt(recipe -> priorityOf(level, recipe, patterns)))
                 .toList();
 
         for (Recipe<?> recipe : candidates) {
@@ -118,7 +112,7 @@ public final class RecipeLookupService {
         return new ResolvedRecipe(
                 recipe.getResultItem(level.registryAccess()),
                 compactIngredients(recipe),
-                recipeTypeId(recipe)
+                recipeTypeId(level, recipe)
         );
     }
 
@@ -170,8 +164,8 @@ public final class RecipeLookupService {
         return expanded;
     }
 
-    private int priorityOf(Recipe<?> recipe, List<String> patterns) {
-        String typeId = normalize(recipeTypeId(recipe));
+    private int priorityOf(Level level, Recipe<?> recipe, List<String> patterns) {
+        String typeId = normalize(recipeTypeId(level, recipe));
         for (int index = 0; index < patterns.size(); index++) {
             if (typeId.contains(patterns.get(index))) {
                 return index;
@@ -180,8 +174,8 @@ public final class RecipeLookupService {
         return Integer.MAX_VALUE;
     }
 
-    private boolean matchesConfiguredType(Recipe<?> recipe, List<String> patterns) {
-        String typeId = normalize(recipeTypeId(recipe));
+    private boolean matchesConfiguredType(Level level, Recipe<?> recipe, List<String> patterns) {
+        String typeId = normalize(recipeTypeId(level, recipe));
         for (String pattern : patterns) {
             if (!pattern.isEmpty() && typeId.contains(pattern)) {
                 return true;
@@ -195,6 +189,8 @@ public final class RecipeLookupService {
             case OUTPUT_PREFERENCE -> CookDelightConfig.CLIENT.preferredOutputRecipeTypes.get();
             case COOKING_POT -> CookDelightConfig.CLIENT.cookingPotRecipeTypes.get();
             case SKILLET -> CookDelightConfig.CLIENT.skilletRecipeTypes.get();
+            case KALEIDOSCOPE -> CookDelightConfig.CLIENT.kaleidoscopeRecipeTypes.get();
+            case KEG -> CookDelightConfig.CLIENT.kegRecipeTypes.get();
         };
 
         return rawPatterns.stream()
@@ -213,23 +209,28 @@ public final class RecipeLookupService {
     }
 
     private String buildOutputCacheKey(ItemStack stack) {
-        return getItemId(stack).toString();
+        return buildItemIdentityKey(stack);
     }
 
     private String buildIngredientCacheKey(List<ItemStack> inputs, LookupProfile profile) {
         List<String> parts = inputs.stream()
-                .map(stack -> getItemId(stack) + "x" + Math.max(1, stack.getCount()))
+                .map(stack -> buildItemIdentityKey(stack) + "x" + Math.max(1, stack.getCount()))
                 .sorted()
                 .toList();
         return profile.name() + "|" + String.join(",", parts);
     }
 
-    private ResourceLocation getItemId(ItemStack stack) {
-        return BuiltInRegistries.ITEM.getKey(stack.getItem());
+    private String buildItemIdentityKey(ItemStack stack) {
+        String tag = stack.getTag() == null ? "" : stack.getTag().toString();
+        return getItemId(stack) + "|" + tag;
     }
 
-    private String recipeTypeId(Recipe<?> recipe) {
-        ResourceLocation id = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+    private ResourceLocation getItemId(ItemStack stack) {
+        return stack.getItem().builtInRegistryHolder().key().location();
+    }
+
+    private String recipeTypeId(Level level, Recipe<?> recipe) {
+        ResourceLocation id = level.registryAccess().registryOrThrow(Registries.RECIPE_TYPE).getKey(recipe.getType());
         return id != null ? id.toString() : recipe.getType().toString();
     }
 

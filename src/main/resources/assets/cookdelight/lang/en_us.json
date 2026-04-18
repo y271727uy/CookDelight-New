@@ -2,5 +2,8 @@
   "gui.cookdelight.recipe": "Recipe:",
   "gui.cookdelight.cooking_pot": "Cooking Pot",
   "gui.cookdelight.skillet": "Skillet",
-  "gui.cookdelight.pot":"Pot"
+  "gui.cookdelight.pot": "Pot",
+  "gui.cookdelight.keg": "Keg",
+  "gui.cookdelight.kaleidoscope_pot": "Pot",
+  "gui.cookdelight.kaleidoscope_stockpot": "Stockpot"
 }

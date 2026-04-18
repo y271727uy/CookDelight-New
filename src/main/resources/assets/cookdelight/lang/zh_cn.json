@@ -1,5 +1,8 @@
 {
   "gui.cookdelight.recipe": "配方:",
   "gui.cookdelight.cooking_pot": "厨锅",
-  "gui.cookdelight.skillet": "煎锅"
+  "gui.cookdelight.skillet": "煎锅",
+  "gui.cookdelight.keg": "发酵桶",
+  "gui.cookdelight.kaleidoscope_pot": "炒锅",
+  "gui.cookdelight.kaleidoscope_stockpot": "汤锅"
 }
