@@ -1,6 +1,5 @@
 package com.y271727uy.cookdelight.client.logic;
 
-import com.y271727uy.cookdelight.client.recipe.LookupProfile;
 import com.y271727uy.cookdelight.client.recipe.RecipeLookupService;
 import com.y271727uy.cookdelight.client.recipe.ResolvedRecipe;
 import com.y271727uy.cookdelight.client.state.KitchenOverlayState;
@@ -8,16 +7,12 @@ import com.y271727uy.cookdelight.config.CookDelightConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 
 import java.util.ArrayList;
@@ -25,21 +20,27 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-// Kitchen-only Kaleidoscope aliases are handled locally here.
 public class KitchenOverlayHandler {
     private static final float FADE_STEP = 0.15f;
 
     private final RecipeLookupService recipeLookupService;
+    private final KitchenOverlayTargetProvider targetProvider;
     private KitchenOverlayState state = KitchenOverlayState.hidden();
 
     public KitchenOverlayHandler(RecipeLookupService recipeLookupService) {
+        this(recipeLookupService, KitchenOverlayProviders.configured());
+    }
+
+    public KitchenOverlayHandler(RecipeLookupService recipeLookupService, KitchenOverlayTargetProvider targetProvider) {
         this.recipeLookupService = recipeLookupService;
+        this.targetProvider = targetProvider;
     }
 
     public void tick(Minecraft minecraft) {
         if (!CookDelightConfig.CLIENT.enableCookingPotOverlay.get()
                 && !CookDelightConfig.CLIENT.enableSkilletOverlay.get()
-                && !CookDelightConfig.CLIENT.enableKaleidoscopeOverlay.get()) {
+                && !CookDelightConfig.CLIENT.enableKaleidoscopeOverlay.get()
+                && !CookDelightConfig.CLIENT.enableKegOverlay.get()) {
             state = KitchenOverlayState.hidden();
             return;
         }
@@ -49,14 +50,14 @@ public class KitchenOverlayHandler {
             return;
         }
 
-        Optional<KitchenTarget> kitchenTarget = findKitchenTarget(minecraft);
+        Optional<KitchenOverlayTarget> kitchenTarget = targetProvider.findTarget(minecraft);
         if (kitchenTarget.isEmpty()) {
             state = fadeOut(state);
             return;
         }
 
-        KitchenTarget target = kitchenTarget.get();
-        KitchenSnapshot snapshot = readSnapshot(target.blockPos(), target.blockEntity(), target.lookupProfile() == LookupProfile.KALEIDOSCOPE || target.lookupProfile() == LookupProfile.KEG);
+        KitchenOverlayTarget target = kitchenTarget.get();
+        KitchenSnapshot snapshot = readSnapshot(target.blockPos(), target.blockEntity(), target.allowReflectionFallback());
         if (snapshot.ingredients().isEmpty()) {
             state = fadeOut(state);
             return;
@@ -106,75 +107,6 @@ public class KitchenOverlayHandler {
                 previousFade,
                 fade
         );
-    }
-
-    private Optional<KitchenTarget> findKitchenTarget(Minecraft minecraft) {
-        if (minecraft.hitResult == null || minecraft.hitResult.getType() != HitResult.Type.BLOCK) {
-            return Optional.empty();
-        }
-
-        if (minecraft.level == null) {
-            return Optional.empty();
-        }
-
-        var level = minecraft.level;
-        BlockHitResult blockHitResult = (BlockHitResult) minecraft.hitResult;
-        BlockEntity blockEntity = level.getBlockEntity(blockHitResult.getBlockPos());
-        if (blockEntity == null) {
-            return Optional.empty();
-        }
-
-        BlockState blockState = blockEntity.getBlockState();
-        String blockId = String.valueOf(BuiltInRegistries.BLOCK.getKey(blockState.getBlock()));
-        String blockEntityTypeId = String.valueOf(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()));
-
-        if (matchesAny(blockId, blockEntityTypeId, "farmersdelight:cooking_pot")) {
-            if (!CookDelightConfig.CLIENT.enableCookingPotOverlay.get()) {
-                return Optional.empty();
-            }
-            return Optional.of(new KitchenTarget(blockHitResult.getBlockPos(), blockEntity, false, LookupProfile.COOKING_POT, Component.translatable("gui.cookdelight.cooking_pot")));
-        }
-
-        if (matchesAny(blockId, blockEntityTypeId, "farmersdelight:skillet")) {
-            if (!CookDelightConfig.CLIENT.enableSkilletOverlay.get()) {
-                return Optional.empty();
-            }
-            return Optional.of(new KitchenTarget(blockHitResult.getBlockPos(), blockEntity, true, LookupProfile.SKILLET, Component.translatable("gui.cookdelight.skillet")));
-        }
-
-        if (matchesAny(blockId, blockEntityTypeId, "kaleidoscope_cookery:pot")) {
-            if (!CookDelightConfig.CLIENT.enableKaleidoscopeOverlay.get()) {
-                return Optional.empty();
-            }
-            return Optional.of(new KitchenTarget(blockHitResult.getBlockPos(), blockEntity, false, LookupProfile.KALEIDOSCOPE, Component.translatable("gui.cookdelight.kaleidoscope_pot")));
-        }
-
-        if (matchesAny(blockId, blockEntityTypeId, "kaleidoscope_cookery:stockpot")) {
-            if (!CookDelightConfig.CLIENT.enableKaleidoscopeOverlay.get()) {
-                return Optional.empty();
-            }
-            return Optional.of(new KitchenTarget(blockHitResult.getBlockPos(), blockEntity, false, LookupProfile.KALEIDOSCOPE, Component.translatable("gui.cookdelight.kaleidoscope_stockpot")));
-        }
-
-        if (matchesAny(blockId, blockEntityTypeId, "kaleidoscope_cookery:shawarma_spit")) {
-            if (!CookDelightConfig.CLIENT.enableKaleidoscopeOverlay.get()) {
-                return Optional.empty();
-            }
-            return Optional.of(new KitchenTarget(blockHitResult.getBlockPos(), blockEntity, false, LookupProfile.KALEIDOSCOPE, Component.translatable("gui.cookdelight.kaleidoscope_shawarma_spit")));
-        }
-
-        if (matchesAny(blockId, blockEntityTypeId, "brewinandchewin:keg")) {
-            if (!CookDelightConfig.CLIENT.enableKegOverlay.get()) {
-                return Optional.empty();
-            }
-            return Optional.of(new KitchenTarget(blockHitResult.getBlockPos(), blockEntity, false, LookupProfile.KEG, Component.translatable("gui.cookdelight.keg")));
-        }
-
-        return Optional.empty();
-    }
-
-    private boolean matchesAny(String actual, String fallback, String expected) {
-        return expected.equals(actual) || expected.equals(fallback);
     }
 
     private KitchenSnapshot readSnapshot(BlockPos pos, BlockEntity blockEntity, boolean allowReflectionFallback) {
@@ -287,8 +219,6 @@ public class KitchenOverlayHandler {
         return results;
     }
 
-    private record KitchenTarget(BlockPos blockPos, BlockEntity blockEntity, boolean skillet, LookupProfile lookupProfile, Component title) {
-    }
 
     private record KitchenSnapshot(BlockPos blockPos, List<ItemStack> ingredients, int currentCookTime, int totalCookTime) {
     }
