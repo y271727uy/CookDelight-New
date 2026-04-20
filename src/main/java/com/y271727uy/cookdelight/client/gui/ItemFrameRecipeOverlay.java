@@ -1,7 +1,7 @@
 package com.y271727uy.cookdelight.client.gui;
 
 import com.y271727uy.cookdelight.client.logic.ItemFrameOverlayHandler;
-import com.y271727uy.cookdelight.client.recipe.RecipeLookupService;
+import com.y271727uy.cookdelight.client.recipe.ItemFrameRecipeLookup;
 import com.y271727uy.cookdelight.client.render.ItemFrameOverlayRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -13,11 +13,11 @@ public class ItemFrameRecipeOverlay {
     private final ItemFrameOverlayRenderer renderer;
 
     public ItemFrameRecipeOverlay() {
-        this(new RecipeLookupService());
+        this(new ItemFrameRecipeLookup());
     }
 
-    public ItemFrameRecipeOverlay(RecipeLookupService recipeLookupService) {
-        this.handler = new ItemFrameOverlayHandler(recipeLookupService);
+    public ItemFrameRecipeOverlay(ItemFrameRecipeLookup recipeLookup) {
+        this.handler = new ItemFrameOverlayHandler(recipeLookup);
         this.renderer = new ItemFrameOverlayRenderer();
     }
 

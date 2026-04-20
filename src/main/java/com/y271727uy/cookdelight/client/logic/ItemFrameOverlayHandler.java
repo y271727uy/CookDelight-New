@@ -1,6 +1,6 @@
 package com.y271727uy.cookdelight.client.logic;
 
-import com.y271727uy.cookdelight.client.recipe.RecipeLookupService;
+import com.y271727uy.cookdelight.client.recipe.ItemFrameRecipeLookup;
 import com.y271727uy.cookdelight.client.recipe.ResolvedRecipe;
 import com.y271727uy.cookdelight.client.state.ItemFrameOverlayState;
 import com.y271727uy.cookdelight.config.CookDelightConfig;
@@ -16,11 +16,11 @@ import java.util.Optional;
 public class ItemFrameOverlayHandler {
     private static final float FADE_STEP = 0.15f;
 
-    private final RecipeLookupService recipeLookupService;
+    private final ItemFrameRecipeLookup recipeLookup;
     private ItemFrameOverlayState state = ItemFrameOverlayState.hidden();
 
-    public ItemFrameOverlayHandler(RecipeLookupService recipeLookupService) {
-        this.recipeLookupService = recipeLookupService;
+    public ItemFrameOverlayHandler(ItemFrameRecipeLookup recipeLookup) {
+        this.recipeLookup = recipeLookup;
     }
 
     public void tick(Minecraft minecraft) {
@@ -35,8 +35,8 @@ public class ItemFrameOverlayHandler {
         }
 
         Optional<FrameTarget> frameTarget = findTarget(minecraft);
-        if (frameTarget.isPresent() && recipeLookupService.isLikelyFood(frameTarget.get().stack())) {
-            Optional<ResolvedRecipe> resolvedRecipe = recipeLookupService.findPreferredRecipeByOutput(minecraft.level, frameTarget.get().stack());
+        if (frameTarget.isPresent() && recipeLookup.isLikelyFood(frameTarget.get().stack())) {
+            Optional<ResolvedRecipe> resolvedRecipe = recipeLookup.findRecipe(minecraft.level, frameTarget.get().stack());
             if (resolvedRecipe.isPresent() && resolvedRecipe.get().hasIngredients()) {
                 state = visible(frameTarget.get().pos(), frameTarget.get().stack(), resolvedRecipe.get().ingredients());
                 return;

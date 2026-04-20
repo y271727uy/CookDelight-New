@@ -1,7 +1,7 @@
 package com.y271727uy.cookdelight.client.gui;
 
 import com.y271727uy.cookdelight.client.logic.KitchenOverlayHandler;
-import com.y271727uy.cookdelight.client.recipe.RecipeLookupService;
+import com.y271727uy.cookdelight.client.recipe.KitchenRecipeLookup;
 import com.y271727uy.cookdelight.client.render.KitchenOverlayRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -13,11 +13,11 @@ public class KitchenUtilsOverlay {
     private final KitchenOverlayRenderer renderer;
 
     public KitchenUtilsOverlay() {
-        this(new RecipeLookupService());
+        this(new KitchenRecipeLookup());
     }
 
-    public KitchenUtilsOverlay(RecipeLookupService recipeLookupService) {
-        this.handler = new KitchenOverlayHandler(recipeLookupService);
+    public KitchenUtilsOverlay(KitchenRecipeLookup recipeLookup) {
+        this.handler = new KitchenOverlayHandler(recipeLookup);
         this.renderer = new KitchenOverlayRenderer();
     }
 

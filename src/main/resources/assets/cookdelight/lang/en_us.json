@@ -5,5 +5,14 @@
   "gui.cookdelight.pot": "Pot",
   "gui.cookdelight.keg": "Keg",
   "gui.cookdelight.kaleidoscope_pot": "Pot",
-  "gui.cookdelight.kaleidoscope_stockpot": "Stockpot"
+  "gui.cookdelight.kaleidoscope_stockpot": "Stockpot",
+  "gui.cookdelight.kaleidoscope_shawarma_spit": "Shawarma Spit",
+  "gui.cookdelight.manors_fryer": "Fryer",
+  "gui.cookdelight.manors_saucepan_and_whisk": "Saucepan and Whisk",
+  "gui.cookdelight.manors_teapot": "Teapot",
+  "gui.cookdelight.manors_fermenter": "Fermenter",
+  "gui.cookdelight.manors_blender": "Blender",
+  "gui.cookdelight.manors_stock_pot": "Stock Pot",
+  "gui.cookdelight.manors_ice_cream_machine": "Ice Cream Machine",
+  "gui.cookdelight.manors_oven": "Oven"
 }

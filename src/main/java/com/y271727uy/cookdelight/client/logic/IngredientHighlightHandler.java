@@ -1,6 +1,6 @@
 package com.y271727uy.cookdelight.client.logic;
 
-import com.y271727uy.cookdelight.client.recipe.RecipeLookupService;
+import com.y271727uy.cookdelight.client.recipe.IngredientHighlightRecipeLookup;
 import com.y271727uy.cookdelight.client.recipe.ResolvedRecipe;
 import com.y271727uy.cookdelight.client.state.IngredientHighlightState;
 import com.y271727uy.cookdelight.config.CookDelightConfig;
@@ -13,15 +13,15 @@ import net.minecraft.world.item.ItemStack;
 import java.util.Optional;
 
 public class IngredientHighlightHandler {
-    private final RecipeLookupService recipeLookupService;
+    private final IngredientHighlightRecipeLookup recipeLookup;
 
     private int lastHoveredSlotIndex = -1;
     private long hoverStartTime = 0L;
     private ItemStack trackingItem = ItemStack.EMPTY;
     private IngredientHighlightState state = IngredientHighlightState.inactive();
 
-    public IngredientHighlightHandler(RecipeLookupService recipeLookupService) {
-        this.recipeLookupService = recipeLookupService;
+    public IngredientHighlightHandler(IngredientHighlightRecipeLookup recipeLookup) {
+        this.recipeLookup = recipeLookup;
     }
 
     public void update(Minecraft minecraft, AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
@@ -48,7 +48,7 @@ public class IngredientHighlightHandler {
         }
 
         ItemStack stack = hoveredSlot.getItem();
-        if (!recipeLookupService.isLikelyFood(stack)) {
+        if (!recipeLookup.isLikelyFood(stack)) {
             reset();
             return;
         }
@@ -67,7 +67,7 @@ public class IngredientHighlightHandler {
             return;
         }
 
-        Optional<ResolvedRecipe> recipe = recipeLookupService.findPreferredRecipeByOutput(minecraft.level, trackingItem);
+        Optional<ResolvedRecipe> recipe = recipeLookup.findRecipe(minecraft.level, trackingItem);
         if (recipe.isPresent() && recipe.get().hasIngredients()) {
             state = new IngredientHighlightState(hoveredSlotIndex, trackingItem, recipe.get().ingredients(), true);
             return;

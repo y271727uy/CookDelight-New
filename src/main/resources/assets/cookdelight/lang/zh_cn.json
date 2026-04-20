@@ -4,5 +4,14 @@
   "gui.cookdelight.skillet": "煎锅",
   "gui.cookdelight.keg": "发酵桶",
   "gui.cookdelight.kaleidoscope_pot": "炒锅",
-  "gui.cookdelight.kaleidoscope_stockpot": "汤锅"
+  "gui.cookdelight.kaleidoscope_stockpot": "汤锅",
+  "gui.cookdelight.kaleidoscope_shawarma_spit": "沙威玛烤架",
+  "gui.cookdelight.manors_fryer": "炸锅",
+  "gui.cookdelight.manors_saucepan_and_whisk": "小奶锅套件",
+  "gui.cookdelight.manors_teapot": "茶壶",
+  "gui.cookdelight.manors_fermenter": "发酵桶",
+  "gui.cookdelight.manors_blender": "搅拌机",
+  "gui.cookdelight.manors_stock_pot": "汤锅",
+  "gui.cookdelight.manors_ice_cream_machine": "冰淇淋机",
+  "gui.cookdelight.manors_oven": "烤箱"
 }

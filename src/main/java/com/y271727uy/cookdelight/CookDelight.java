@@ -3,6 +3,9 @@ package com.y271727uy.cookdelight;
 import com.y271727uy.cookdelight.client.gui.ItemFrameRecipeOverlay;
 import com.y271727uy.cookdelight.client.gui.KitchenUtilsOverlay;
 import com.y271727uy.cookdelight.client.gui.SmartIngredientHighlighting;
+import com.y271727uy.cookdelight.client.recipe.IngredientHighlightRecipeLookup;
+import com.y271727uy.cookdelight.client.recipe.ItemFrameRecipeLookup;
+import com.y271727uy.cookdelight.client.recipe.KitchenRecipeLookup;
 import com.y271727uy.cookdelight.config.CookDelightConfig;
 import com.y271727uy.cookdelight.registry.ItemRegistry;
 
@@ -22,7 +25,11 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 public class CookDelight
 {
     public static final String MOD_ID = "cookdelight";
+    private static final ItemFrameRecipeLookup ITEM_FRAME_RECIPE_LOOKUP = new ItemFrameRecipeLookup();
+    private static final IngredientHighlightRecipeLookup INGREDIENT_HIGHLIGHT_RECIPE_LOOKUP = new IngredientHighlightRecipeLookup();
+    private static final KitchenRecipeLookup KITCHEN_RECIPE_LOOKUP = new KitchenRecipeLookup();
 
+    @SuppressWarnings("removal")
     public CookDelight()
     {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -42,9 +49,9 @@ public class CookDelight
         @SubscribeEvent 
         public static void onClientSetup(FMLClientSetupEvent event) {
             event.enqueueWork(() -> {
-                MinecraftForge.EVENT_BUS.register(new ItemFrameRecipeOverlay());
-                MinecraftForge.EVENT_BUS.register(new KitchenUtilsOverlay());
-                MinecraftForge.EVENT_BUS.register(new SmartIngredientHighlighting());
+                MinecraftForge.EVENT_BUS.register(new ItemFrameRecipeOverlay(ITEM_FRAME_RECIPE_LOOKUP));
+                MinecraftForge.EVENT_BUS.register(new KitchenUtilsOverlay(KITCHEN_RECIPE_LOOKUP));
+                MinecraftForge.EVENT_BUS.register(new SmartIngredientHighlighting(INGREDIENT_HIGHLIGHT_RECIPE_LOOKUP));
             });
         }
     }

@@ -8,6 +8,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,40 +19,51 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class RecipeLookupService {
-    private final Map<String, Optional<ResolvedRecipe>> outputCache = new HashMap<>();
-    private final Map<String, Optional<ResolvedRecipe>> ingredientCache = new HashMap<>();
+    private final Map<OutputLookupKey, Optional<ResolvedRecipe>> outputCache = new HashMap<>();
+    private final Map<InputLookupKey, Optional<ResolvedRecipe>> ingredientCache = new HashMap<>();
     private RecipeManager cachedRecipeManager;
 
     public RecipeLookupService() {
     }
 
     public Optional<ResolvedRecipe> findPreferredRecipeByOutput(Level level, ItemStack output) {
+        return findDisplayRecipeByOutput(level, output, RecipeLookupContext.ITEM_FRAME);
+    }
+
+    public Optional<ResolvedRecipe> findDisplayRecipeByOutput(Level level, ItemStack output, RecipeLookupContext context) {
         if (level == null || output.isEmpty()) {
             return Optional.empty();
         }
 
         syncRecipeManager(level);
-        String cacheKey = buildOutputCacheKey(output);
-        return outputCache.computeIfAbsent(cacheKey, ignored -> resolvePreferredRecipe(level, output));
+        List<String> preferredTypes = outputPatterns(context);
+        OutputLookupKey cacheKey = new OutputLookupKey(buildItemIdentityKey(output), context, preferredTypes);
+        return outputCache.computeIfAbsent(cacheKey, ignored -> resolvePreferredRecipe(level, output, preferredTypes));
     }
 
     public Optional<ResolvedRecipe> findPredictedRecipe(Level level, List<ItemStack> inputs, LookupProfile profile) {
+        return findPredictedRecipe(level, inputs, RecipeLookupContext.KITCHEN, normalizedPatterns(profile));
+    }
+
+    public Optional<ResolvedRecipe> findPredictedRecipe(Level level, List<ItemStack> inputs, List<String> recipeTypePatterns) {
+        return findPredictedRecipe(level, inputs, RecipeLookupContext.KITCHEN, recipeTypePatterns);
+    }
+
+    public Optional<ResolvedRecipe> findPredictedRecipe(Level level, List<ItemStack> inputs, RecipeLookupContext context, List<String> recipeTypePatterns) {
         if (level == null || inputs == null || inputs.isEmpty()) {
             return Optional.empty();
         }
 
-        List<ItemStack> normalizedInputs = inputs.stream()
-                .filter(stack -> stack != null && !stack.isEmpty())
-                .map(ItemStack::copy)
-                .toList();
+        List<ItemStack> normalizedInputs = normalizeInputs(inputs);
 
         if (normalizedInputs.isEmpty()) {
             return Optional.empty();
         }
 
         syncRecipeManager(level);
-        String cacheKey = buildIngredientCacheKey(normalizedInputs, profile);
-        return ingredientCache.computeIfAbsent(cacheKey, ignored -> resolvePredictedRecipe(level, normalizedInputs, profile));
+        List<String> normalizedPatterns = normalizePatterns(recipeTypePatterns);
+        InputLookupKey cacheKey = new InputLookupKey(context, normalizedPatterns, buildIngredientInputKeys(normalizedInputs));
+        return ingredientCache.computeIfAbsent(cacheKey, ignored -> resolvePredictedRecipe(level, normalizedInputs, normalizedPatterns));
     }
 
     public boolean isLikelyFood(ItemStack stack) {
@@ -73,47 +85,46 @@ public final class RecipeLookupService {
         return false;
     }
 
-    private Optional<ResolvedRecipe> resolvePreferredRecipe(Level level, ItemStack output) {
-        List<Recipe<?>> matches = new ArrayList<>();
-        for (Recipe<?> recipe : level.getRecipeManager().getRecipes()) {
-            ItemStack result = recipe.getResultItem(level.registryAccess());
-            if (!result.isEmpty() && ItemStack.isSameItemSameTags(result, output)) {
-                matches.add(recipe);
-            }
-        }
-
-        if (matches.isEmpty()) {
-            return Optional.empty();
-        }
-
-        List<String> priorities = normalizedPatterns(LookupProfile.OUTPUT_PREFERENCE);
-        matches.sort(Comparator.comparingInt(recipe -> priorityOf(level, recipe, priorities)));
-        return Optional.of(toResolvedRecipe(level, matches.get(0)));
+    private Optional<ResolvedRecipe> resolvePreferredRecipe(Level level, ItemStack output, List<String> preferredTypes) {
+        return level.getRecipeManager().getRecipes().stream()
+                .map(recipe -> toCandidate(level, recipe))
+                .filter(candidate -> !candidate.output().isEmpty())
+                .filter(candidate -> ItemStack.isSameItemSameTags(candidate.output(), output))
+                .filter(candidate -> !candidate.ingredients().isEmpty())
+                .sorted(candidateComparator(preferredTypes))
+                .map(this::toResolvedRecipe)
+                .findFirst();
     }
 
-    private Optional<ResolvedRecipe> resolvePredictedRecipe(Level level, List<ItemStack> inputs, LookupProfile profile) {
-        List<String> patterns = normalizedPatterns(profile);
-        List<Recipe<?>> candidates = level.getRecipeManager().getRecipes().stream()
-                .filter(recipe -> patterns.isEmpty() || matchesConfiguredType(level, recipe, patterns))
-                .sorted(Comparator.comparingInt(recipe -> priorityOf(level, recipe, patterns)))
+    private Optional<ResolvedRecipe> resolvePredictedRecipe(Level level, List<ItemStack> inputs, List<String> patterns) {
+        List<RecipeCandidate> candidates = level.getRecipeManager().getRecipes().stream()
+                .map(recipe -> toCandidate(level, recipe))
+                .filter(candidate -> patterns.isEmpty() || matchesConfiguredType(candidate.normalizedRecipeTypeId(), patterns))
+                .sorted(candidateComparator(patterns))
                 .toList();
 
-        for (Recipe<?> recipe : candidates) {
-            List<Ingredient> ingredients = compactIngredients(recipe);
-            if (!ingredients.isEmpty() && matchesAllIngredients(inputs, ingredients)) {
-                return Optional.of(toResolvedRecipe(level, recipe));
+        for (RecipeCandidate candidate : candidates) {
+            if (!candidate.ingredients().isEmpty() && matchesAllIngredients(inputs, candidate.ingredients())) {
+                return Optional.of(toResolvedRecipe(candidate));
             }
         }
 
         return Optional.empty();
     }
 
-    private ResolvedRecipe toResolvedRecipe(Level level, Recipe<?> recipe) {
-        return new ResolvedRecipe(
+    private RecipeCandidate toCandidate(Level level, Recipe<?> recipe) {
+        String recipeTypeId = recipeTypeId(level, recipe);
+        return new RecipeCandidate(
                 recipe.getResultItem(level.registryAccess()),
                 compactIngredients(recipe),
-                recipeTypeId(level, recipe)
+                recipeTypeId,
+                normalize(recipeTypeId),
+                recipe.getId().toString()
         );
+    }
+
+    private ResolvedRecipe toResolvedRecipe(RecipeCandidate candidate) {
+        return new ResolvedRecipe(candidate.output(), candidate.ingredients(), candidate.recipeTypeId());
     }
 
     private List<Ingredient> compactIngredients(Recipe<?> recipe) {
@@ -164,24 +175,45 @@ public final class RecipeLookupService {
         return expanded;
     }
 
-    private int priorityOf(Level level, Recipe<?> recipe, List<String> patterns) {
-        String typeId = normalize(recipeTypeId(level, recipe));
+    private Comparator<RecipeCandidate> candidateComparator(List<String> patterns) {
+        return Comparator
+                .comparingInt((RecipeCandidate candidate) -> priorityOf(candidate.normalizedRecipeTypeId(), patterns))
+                .thenComparingInt(candidate -> candidate.ingredients().size())
+                .thenComparing(RecipeCandidate::recipeId);
+    }
+
+    private int priorityOf(String normalizedTypeId, List<String> patterns) {
         for (int index = 0; index < patterns.size(); index++) {
-            if (typeId.contains(patterns.get(index))) {
+            if (matchPattern(normalizedTypeId, patterns.get(index))) {
                 return index;
             }
         }
-        return Integer.MAX_VALUE;
+        return patterns.isEmpty() ? 0 : Integer.MAX_VALUE;
     }
 
-    private boolean matchesConfiguredType(Level level, Recipe<?> recipe, List<String> patterns) {
-        String typeId = normalize(recipeTypeId(level, recipe));
+    private boolean matchesConfiguredType(String normalizedTypeId, List<String> patterns) {
         for (String pattern : patterns) {
-            if (!pattern.isEmpty() && typeId.contains(pattern)) {
+            if (matchPattern(normalizedTypeId, pattern)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean matchPattern(String normalizedTypeId, String pattern) {
+        if (normalizedTypeId.isEmpty() || pattern == null || pattern.isEmpty()) {
+            return false;
+        }
+
+        if (pattern.indexOf(':') >= 0) {
+            return normalizedTypeId.equals(pattern);
+        }
+
+        int separatorIndex = normalizedTypeId.indexOf(':');
+        String path = separatorIndex >= 0 && separatorIndex + 1 < normalizedTypeId.length()
+                ? normalizedTypeId.substring(separatorIndex + 1)
+                : normalizedTypeId;
+        return path.equals(pattern);
     }
 
     private List<String> normalizedPatterns(LookupProfile profile) {
@@ -192,6 +224,28 @@ public final class RecipeLookupService {
             case KALEIDOSCOPE -> CookDelightConfig.CLIENT.kaleidoscopeRecipeTypes.get();
             case KEG -> CookDelightConfig.CLIENT.kegRecipeTypes.get();
         };
+
+        return normalizePatterns(rawPatterns);
+    }
+
+    private List<String> outputPatterns(RecipeLookupContext context) {
+        return switch (context) {
+            case ITEM_FRAME, INGREDIENT_HIGHLIGHT -> normalizedPatterns(LookupProfile.OUTPUT_PREFERENCE);
+            case KITCHEN -> List.of();
+        };
+    }
+
+    private List<ItemStack> normalizeInputs(List<ItemStack> inputs) {
+        return inputs.stream()
+                .filter(stack -> stack != null && !stack.isEmpty())
+                .map(ItemStack::copy)
+                .toList();
+    }
+
+    private List<String> normalizePatterns(List<? extends String> rawPatterns) {
+        if (rawPatterns == null || rawPatterns.isEmpty()) {
+            return List.of();
+        }
 
         return rawPatterns.stream()
                 .map(this::normalize)
@@ -208,16 +262,11 @@ public final class RecipeLookupService {
         }
     }
 
-    private String buildOutputCacheKey(ItemStack stack) {
-        return buildItemIdentityKey(stack);
-    }
-
-    private String buildIngredientCacheKey(List<ItemStack> inputs, LookupProfile profile) {
-        List<String> parts = inputs.stream()
+    private List<String> buildIngredientInputKeys(List<ItemStack> inputs) {
+        return inputs.stream()
                 .map(stack -> buildItemIdentityKey(stack) + "x" + Math.max(1, stack.getCount()))
                 .sorted()
                 .toList();
-        return profile.name() + "|" + String.join(",", parts);
     }
 
     private String buildItemIdentityKey(ItemStack stack) {
@@ -226,7 +275,8 @@ public final class RecipeLookupService {
     }
 
     private ResourceLocation getItemId(ItemStack stack) {
-        return stack.getItem().builtInRegistryHolder().key().location();
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        return id != null ? id : new ResourceLocation("minecraft", "air");
     }
 
     private String recipeTypeId(Level level, Recipe<?> recipe) {
@@ -236,6 +286,28 @@ public final class RecipeLookupService {
 
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private record RecipeCandidate(
+            ItemStack output,
+            List<Ingredient> ingredients,
+            String recipeTypeId,
+            String normalizedRecipeTypeId,
+            String recipeId
+    ) {
+    }
+
+    private record OutputLookupKey(String outputKey, RecipeLookupContext context, List<String> patterns) {
+        private OutputLookupKey {
+            patterns = List.copyOf(patterns);
+        }
+    }
+
+    private record InputLookupKey(RecipeLookupContext context, List<String> patterns, List<String> inputKeys) {
+        private InputLookupKey {
+            patterns = List.copyOf(patterns);
+            inputKeys = List.copyOf(inputKeys);
+        }
     }
 }
 

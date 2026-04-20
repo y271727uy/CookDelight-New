@@ -1,23 +1,30 @@
 package com.y271727uy.cookdelight.client.logic;
 
-import com.y271727uy.cookdelight.client.recipe.LookupProfile;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 public record KitchenTargetDefinition(
 		List<String> identifiers,
-		LookupProfile lookupProfile,
+		Supplier<List<? extends String>> recipeTypePatternsSupplier,
 		boolean skillet,
 		String titleKey,
 		boolean allowReflectionFallback,
+		int maxUnusedInputs,
+		boolean requireUniqueBestPrediction,
+		KitchenMachineSnapshotReader snapshotReader,
 		BooleanSupplier enabledSupplier
 ) {
 	public KitchenTargetDefinition {
 		identifiers = List.copyOf(identifiers);
 		titleKey = titleKey == null ? "" : titleKey;
+		recipeTypePatternsSupplier = recipeTypePatternsSupplier == null ? List::of : recipeTypePatternsSupplier;
+		maxUnusedInputs = Math.max(0, maxUnusedInputs);
+		snapshotReader = snapshotReader == null ? GenericKitchenMachineSnapshotReader.standard(allowReflectionFallback) : snapshotReader;
 		enabledSupplier = enabledSupplier == null ? () -> true : enabledSupplier;
 	}
 
@@ -34,16 +41,28 @@ public record KitchenTargetDefinition(
 		return false;
 	}
 
-	public com.y271727uy.cookdelight.client.logic.KitchenOverlayTarget toTarget(net.minecraft.core.BlockPos blockPos, BlockEntity blockEntity) {
-		return new com.y271727uy.cookdelight.client.logic.KitchenOverlayTarget(
+	public List<String> recipeTypePatterns() {
+		List<? extends String> patterns = recipeTypePatternsSupplier.get();
+		if (patterns == null || patterns.isEmpty()) {
+			return List.of();
+		}
+
+		return patterns.stream()
+				.map(pattern -> pattern == null ? "" : pattern)
+				.toList();
+	}
+
+	public KitchenOverlayTarget toTarget(BlockPos blockPos, BlockEntity blockEntity) {
+		return KitchenOverlayTarget.createWithPredictionPolicy(
 				blockPos,
 				blockEntity,
 				skillet,
-				lookupProfile,
+				recipeTypePatterns(),
 				Component.translatable(titleKey),
-				allowReflectionFallback
+				maxUnusedInputs,
+				requireUniqueBestPrediction,
+				snapshotReader
 		);
 	}
 }
-
 

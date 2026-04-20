@@ -1,7 +1,7 @@
 package com.y271727uy.cookdelight.client.gui;
 
 import com.y271727uy.cookdelight.client.logic.IngredientHighlightHandler;
-import com.y271727uy.cookdelight.client.recipe.RecipeLookupService;
+import com.y271727uy.cookdelight.client.recipe.IngredientHighlightRecipeLookup;
 import com.y271727uy.cookdelight.client.render.IngredientHighlightRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -13,11 +13,11 @@ public class SmartIngredientHighlighting {
     private final IngredientHighlightRenderer renderer;
 
     public SmartIngredientHighlighting() {
-        this(new RecipeLookupService());
+        this(new IngredientHighlightRecipeLookup());
     }
 
-    public SmartIngredientHighlighting(RecipeLookupService recipeLookupService) {
-        this.handler = new IngredientHighlightHandler(recipeLookupService);
+    public SmartIngredientHighlighting(IngredientHighlightRecipeLookup recipeLookup) {
+        this.handler = new IngredientHighlightHandler(recipeLookup);
         this.renderer = new IngredientHighlightRenderer();
     }
 
