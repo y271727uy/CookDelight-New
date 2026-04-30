@@ -18,7 +18,7 @@ side="BOTH"
 
 [[dependencies.cookdelight]]
 modId="farmersdelight"
-mandatory=true
+mandatory=false
 versionRange="[0,)"
 ordering="NONE"
 side="BOTH"
